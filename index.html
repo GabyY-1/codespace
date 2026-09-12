@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>WebCode</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><div class="brand-mark">&lt;/&gt;</div><div><strong>WebCode</strong><span>Éditeur web</span></div></div>
+  <div class="toolbar">
+    <button id="newProjectBtn" class="tool-btn">Nouveau</button>
+    <button id="importBtn" class="tool-btn">Importer</button>
+    <button id="downloadFileBtn" class="tool-btn">Télécharger</button>
+    <button id="downloadProjectBtn" class="tool-btn">Projet ZIP</button>
+    <button id="previewBtn" class="tool-btn primary">▶ Preview</button>
+  </div>
+</header>
+<main class="workspace">
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div><div class="panel-title">Fichiers</div><div id="fileCount" class="panel-subtitle">0 fichier</div></div>
+      <div class="mini-actions"><button id="addFileBtn" title="Nouveau fichier">+</button><button id="addFolderBtn" title="Nouveau dossier">📁</button></div>
+    </div>
+    <div id="fileTree" class="file-tree"></div>
+    <div class="sidebar-bottom"><button id="collapseBtn">Réduire les dossiers</button></div>
+  </aside>
+  <section class="editor-panel">
+    <div class="editor-head"><div class="file-tab"><span id="fileIcon" class="file-icon">HTML</span><span id="activeFileName">index.html</span><span id="dirtyDot" class="dirty-dot hidden">●</span></div><div class="editor-tools"><button id="findBtn" title="Rechercher">⌕</button><button id="formatBtn" title="Formater">⟲</button></div></div>
+    <div class="editor-wrap"><div id="lineNumbers" class="line-numbers">1</div><textarea id="codeEditor" class="code-editor" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off" wrap="off"></textarea></div>
+    <div class="statusbar"><span id="cursorInfo">Ln 1, Col 1</span><span id="languageInfo">HTML</span><span id="sizeInfo">0 B</span></div>
+  </section>
+  <section class="preview-panel">
+    <div class="preview-head"><div class="preview-label"><span class="live-dot"></span><span>Preview</span><span id="previewFileName" class="muted">index.html</span></div><div class="preview-actions"><button id="refreshPreviewBtn" title="Actualiser">↻</button><button id="openPreviewBtn" title="Nouvel onglet">↗</button></div></div>
+    <div class="preview-address"><span>●</span><span id="previewAddress">preview://index.html</span></div>
+    <div class="device-bar"><button class="device active" data-device="desktop">Desktop</button><button class="device" data-device="tablet">Tablet</button><button class="device" data-device="mobile">Mobile</button></div>
+    <div id="previewStage" class="preview-stage"><iframe id="previewFrame" title="Aperçu du site" sandbox="allow-scripts allow-forms allow-modals allow-popups"></iframe></div>
+  </section>
+</main>
+<div id="searchBox" class="floating-search hidden"><input id="searchInput" placeholder="Rechercher dans le fichier…"><span id="searchResult">0 résultat</span><button id="closeSearchBtn">×</button></div>
+<div id="contextMenu" class="context-menu hidden"><button data-action="open">Ouvrir</button><button data-action="rename">Renommer</button><button data-action="duplicate">Dupliquer</button><div class="menu-line"></div><button data-action="delete" class="danger">Supprimer</button></div>
+<div id="modal" class="modal hidden"><div class="modal-card"><div class="modal-head"><div><h2 id="modalTitle">Nouveau fichier</h2><p id="modalText">Créer un élément.</p></div><button id="modalCloseBtn">×</button></div><label id="modalLabel" for="modalInput">Nom</label><input id="modalInput" autocomplete="off" spellcheck="false"><div id="modalError" class="modal-error"></div><div class="modal-actions"><button id="modalCancelBtn">Annuler</button><button id="modalConfirmBtn" class="primary">Valider</button></div></div></div>
+<div id="confirmModal" class="modal hidden"><div class="modal-card small"><div class="modal-head"><div><h2 id="confirmTitle">Confirmer</h2><p id="confirmText"></p></div><button id="confirmCloseBtn">×</button></div><div class="modal-actions"><button id="confirmCancelBtn">Annuler</button><button id="confirmOkBtn" class="danger-btn">Supprimer</button></div></div></div>
+<input id="fileInput" type="file" multiple hidden>
+<div id="toastContainer" class="toast-container"></div>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="script.js"></script>
+</body></html>
