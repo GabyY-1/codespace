@@ -613,3 +613,811 @@ document.addEventListener("click",function(e){const a=e.target.closest("a");if(!
     function init(){loadProject();setupEvents();renderTree();if(state.activeFile&&state.files.has(state.activeFile))openFile(state.activeFile);else{state.activeFile=state.files.keys().next().value||null;if(state.activeFile)openFile(state.activeFile);}setDevice("desktop");buildPreview();}
     init();
 })();
+/* =========================================================
+   AUTO-COMPLÉTION + COLORATION SYNTAXIQUE
+   À COLLER À LA FIN DE SCRIPT.JS
+   ========================================================= */
+
+(() => {
+    "use strict";
+
+    const editor = document.getElementById("codeEditor");
+
+    if (!editor) {
+        return;
+    }
+
+    /* =====================================================
+       STYLE DE LA COLORATION
+       ===================================================== */
+
+    const highlightStyle = document.createElement("style");
+
+    highlightStyle.textContent = `
+        .webcode-highlight-layer {
+            position: absolute;
+            inset: 0;
+
+            padding: 16px 18px 40px;
+
+            overflow: hidden;
+
+            pointer-events: none;
+
+            white-space: pre;
+            word-wrap: normal;
+
+            font-family:
+                "JetBrains Mono",
+                "SFMono-Regular",
+                Consolas,
+                "Liberation Mono",
+                monospace;
+
+            font-size: 13px;
+            line-height: 22px;
+
+            color: #d9dee7;
+
+            tab-size: 4;
+
+            z-index: 0;
+        }
+
+        .editor-wrap {
+            position: relative;
+        }
+
+        .editor-wrap .code-editor {
+            z-index: 1;
+            background: transparent;
+        }
+
+        .webcode-editor-transparent {
+            color: transparent !important;
+            -webkit-text-fill-color: transparent !important;
+            caret-color: white !important;
+        }
+
+        .syntax-tag {
+            color: #78a9ff;
+        }
+
+        .syntax-attribute {
+            color: #d9bd70;
+        }
+
+        .syntax-string {
+            color: #91d391;
+        }
+
+        .syntax-comment {
+            color: #687281;
+        }
+
+        .syntax-keyword {
+            color: #c792ea;
+        }
+
+        .syntax-number {
+            color: #f4a261;
+        }
+
+        .syntax-property {
+            color: #82b7ff;
+        }
+
+        .syntax-function {
+            color: #72d6ca;
+        }
+
+        .syntax-selector {
+            color: #e89cff;
+        }
+
+        .syntax-important {
+            color: #ff8b8b;
+        }
+
+        .syntax-operator {
+            color: #d6a8ff;
+        }
+    `;
+
+    document.head.appendChild(highlightStyle);
+
+
+    /* =====================================================
+       COUCHE DE COLORATION
+       ===================================================== */
+
+    const highlight = document.createElement("pre");
+
+    highlight.className = "webcode-highlight-layer";
+
+    highlight.setAttribute(
+        "aria-hidden",
+        "true"
+    );
+
+    editor.parentElement.insertBefore(
+        highlight,
+        editor
+    );
+
+    editor.classList.add(
+        "webcode-editor-transparent"
+    );
+
+
+    /* =====================================================
+       ÉCHAPPEMENT HTML
+       ===================================================== */
+
+    function escapeHtml(text) {
+        return String(text)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+
+    /* =====================================================
+       PROTECTION DES TOKENS
+       ===================================================== */
+
+    function protectToken(text, className) {
+        return `<span class="${className}">${escapeHtml(text)}</span>`;
+    }
+
+
+    /* =====================================================
+       COLORATION HTML
+       ===================================================== */
+
+    function highlightHTML(code) {
+        let result = escapeHtml(code);
+
+        /* Commentaires */
+        result = result.replace(
+            /(&lt;!--[\s\S]*?--&gt;)/g,
+            '<span class="syntax-comment">$1</span>'
+        );
+
+        /* Balises */
+        result = result.replace(
+            /(&lt;\/?)([a-zA-Z][\w:-]*)([\s\S]*?)(\/?&gt;)/g,
+            function(
+                full,
+                opening,
+                tagName,
+                attributes,
+                closing
+            ) {
+                let coloredAttributes =
+                    attributes;
+
+                coloredAttributes =
+                    coloredAttributes.replace(
+                        /([a-zA-Z_:][\w:.-]*)(=)(&quot;.*?&quot;|&#039;.*?&#039;|[^\s]+)/g,
+                        function(
+                            attrFull,
+                            name,
+                            equal,
+                            value
+                        ) {
+                            return (
+                                '<span class="syntax-attribute">' +
+                                name +
+                                '</span>' +
+                                equal +
+                                '<span class="syntax-string">' +
+                                value +
+                                '</span>'
+                            );
+                        }
+                    );
+
+                return (
+                    escapeHtml(opening) +
+                    '<span class="syntax-tag">' +
+                    tagName +
+                    '</span>' +
+                    coloredAttributes +
+                    escapeHtml(closing)
+                );
+            }
+        );
+
+        return result;
+    }
+
+
+    /* =====================================================
+       COLORATION CSS
+       ===================================================== */
+
+    function highlightCSS(code) {
+        let result = escapeHtml(code);
+
+        /* Commentaires */
+        result = result.replace(
+            /(\/\*[\s\S]*?\*\/)/g,
+            '<span class="syntax-comment">$1</span>'
+        );
+
+        /* Chaînes */
+        result = result.replace(
+            /(&quot;.*?&quot;|&#039;.*?&#039;)/g,
+            '<span class="syntax-string">$1</span>'
+        );
+
+        /* Sélecteurs simples */
+        result = result.replace(
+            /^([^{\n]+)(?=\s*\{)/gm,
+            '<span class="syntax-selector">$1</span>'
+        );
+
+        /* Propriétés CSS */
+        result = result.replace(
+            /([a-zA-Z-]+)(?=\s*:)/g,
+            '<span class="syntax-property">$1</span>'
+        );
+
+        /* Nombres */
+        result = result.replace(
+            /\b\d+(?:\.\d+)?(?:px|rem|em|%|vh|vw|s|ms|deg)?\b/g,
+            '<span class="syntax-number">$&</span>'
+        );
+
+        /* !important */
+        result = result.replace(
+            /!important/g,
+            '<span class="syntax-important">!important</span>'
+        );
+
+        return result;
+    }
+
+
+    /* =====================================================
+       COLORATION JAVASCRIPT
+       ===================================================== */
+
+    function highlightJS(code) {
+        let result = escapeHtml(code);
+
+        /*
+         * On remplace d'abord les commentaires et chaînes
+         * afin d'éviter de colorer leur contenu comme du code.
+         */
+
+        result = result.replace(
+            /(\/\/[^\n]*|\/\*[\s\S]*?\*\/)/g,
+            '<span class="syntax-comment">$1</span>'
+        );
+
+        result = result.replace(
+            /(`(?:\\.|[^`])*`|&quot;(?:\\.|[^&]|&(?!quot;))*?&quot;|&#039;(?:\\.|[^&]|&(?!#039;))*?&#039;)/g,
+            '<span class="syntax-string">$1</span>'
+        );
+
+        /* Mots-clés */
+        result = result.replace(
+            /\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|new|class|extends|import|export|from|default|async|await|try|catch|finally|throw|typeof|instanceof|in|of|this|true|false|null|undefined)\b/g,
+            '<span class="syntax-keyword">$1</span>'
+        );
+
+        /* Nombres */
+        result = result.replace(
+            /\b\d+(?:\.\d+)?\b/g,
+            '<span class="syntax-number">$&</span>'
+        );
+
+        /* Fonctions */
+        result = result.replace(
+            /\b([a-zA-Z_$][\w$]*)(?=\s*\()/g,
+            '<span class="syntax-function">$1</span>'
+        );
+
+        /* Opérateurs */
+        result = result.replace(
+            /(===|!==|==|!=|=>|\+\+|--|\+=|-=|\*=|\/=|&&|\|\||[=+\-*\/%!<>])/g,
+            '<span class="syntax-operator">$1</span>'
+        );
+
+        return result;
+    }
+
+
+    /* =====================================================
+       DÉTERMINER LE TYPE DE FICHIER
+       ===================================================== */
+
+    function getCurrentExtension() {
+        const tabName =
+            document.getElementById(
+                "activeFileName"
+            );
+
+        if (!tabName) {
+            return "";
+        }
+
+        const name =
+            tabName.textContent.trim();
+
+        const dot =
+            name.lastIndexOf(".");
+
+        if (dot === -1) {
+            return "";
+        }
+
+        return name
+            .slice(dot + 1)
+            .toLowerCase();
+    }
+
+
+    /* =====================================================
+       COLORATION PRINCIPALE
+       ===================================================== */
+
+    function updateHighlight() {
+        const code = editor.value;
+
+        const ext =
+            getCurrentExtension();
+
+        let html;
+
+        if (
+            ext === "html" ||
+            ext === "htm"
+        ) {
+            html = highlightHTML(code);
+        } else if (ext === "css") {
+            html = highlightCSS(code);
+        } else if (
+            ext === "js" ||
+            ext === "mjs" ||
+            ext === "cjs"
+        ) {
+            html = highlightJS(code);
+        } else {
+            html = escapeHtml(code);
+        }
+
+        /*
+         * Un espace à la fin permet de garder la hauteur
+         * correcte lorsque le fichier est vide ou finit
+         * par une ligne vide.
+         */
+
+        highlight.innerHTML =
+            html + "\n";
+
+        highlight.scrollTop =
+            editor.scrollTop;
+
+        highlight.scrollLeft =
+            editor.scrollLeft;
+    }
+
+
+    /* =====================================================
+       SYNCHRONISATION DU SCROLL
+       ===================================================== */
+
+    editor.addEventListener(
+        "scroll",
+        function() {
+            highlight.scrollTop =
+                editor.scrollTop;
+
+            highlight.scrollLeft =
+                editor.scrollLeft;
+        }
+    );
+
+
+    /* =====================================================
+       MISE À JOUR QUAND ON ÉCRIT
+       ===================================================== */
+
+    editor.addEventListener(
+        "input",
+        function() {
+            updateHighlight();
+        }
+    );
+
+
+    /* =====================================================
+       AUTO-FERMETURE DES BALISES HTML
+       ===================================================== */
+
+    editor.addEventListener(
+        "keydown",
+        function(event) {
+            if (
+                event.key !== ">" ||
+                editor.selectionStart !==
+                editor.selectionEnd
+            ) {
+                return;
+            }
+
+            const cursor =
+                editor.selectionStart;
+
+            const before =
+                editor.value.slice(
+                    0,
+                    cursor
+                );
+
+            const match =
+                before.match(
+                    /<([a-zA-Z][\w:-]*)[^<>]*$/
+                );
+
+            if (!match) {
+                return;
+            }
+
+            const tag =
+                match[1].toLowerCase();
+
+            const voidTags = [
+                "area",
+                "base",
+                "br",
+                "col",
+                "embed",
+                "hr",
+                "img",
+                "input",
+                "link",
+                "meta",
+                "param",
+                "source",
+                "track",
+                "wbr"
+            ];
+
+            if (
+                voidTags.includes(tag)
+            ) {
+                return;
+            }
+
+            event.preventDefault();
+
+            const after =
+                editor.value.slice(
+                    cursor
+                );
+
+            editor.value =
+                before +
+                ">" +
+                `</${tag}>` +
+                after;
+
+            const newCursor =
+                cursor + 1;
+
+            editor.selectionStart =
+                newCursor;
+
+            editor.selectionEnd =
+                newCursor;
+
+            updateHighlight();
+
+            editor.dispatchEvent(
+                new Event("input", {
+                    bubbles: true
+                })
+            );
+        }
+    );
+
+
+    /* =====================================================
+       AUTO-FERMETURE DES ACCOLADES / PARENTHÈSES
+       ===================================================== */
+
+    editor.addEventListener(
+        "keydown",
+        function(event) {
+            const pairs = {
+                "{": "}",
+                "(": ")",
+                "[": "]",
+                '"': '"',
+                "'": "'",
+                "`": "`"
+            };
+
+            if (!pairs[event.key]) {
+                return;
+            }
+
+            /*
+             * Pour les guillemets simples/doubles/backticks,
+             * on évite de doubler lorsqu'on est déjà devant
+             * le même caractère fermant.
+             */
+
+            const cursor =
+                editor.selectionStart;
+
+            const end =
+                editor.selectionEnd;
+
+            if (cursor !== end) {
+                return;
+            }
+
+            const nextChar =
+                editor.value.charAt(cursor);
+
+            if (
+                (
+                    event.key === '"' ||
+                    event.key === "'" ||
+                    event.key === "`"
+                ) &&
+                nextChar === pairs[event.key]
+            ) {
+                event.preventDefault();
+
+                editor.selectionStart =
+                    cursor + 1;
+
+                editor.selectionEnd =
+                    cursor + 1;
+
+                return;
+            }
+
+            event.preventDefault();
+
+            const closing =
+                pairs[event.key];
+
+            const before =
+                editor.value.slice(
+                    0,
+                    cursor
+                );
+
+            const after =
+                editor.value.slice(
+                    cursor
+                );
+
+            editor.value =
+                before +
+                event.key +
+                closing +
+                after;
+
+            editor.selectionStart =
+                cursor + 1;
+
+            editor.selectionEnd =
+                cursor + 1;
+
+            updateHighlight();
+
+            editor.dispatchEvent(
+                new Event("input", {
+                    bubbles: true
+                })
+            );
+        }
+    );
+
+
+    /* =====================================================
+       ÉVITER DE TAPER DEUX FOIS UNE FERMETURE
+       ===================================================== */
+
+    editor.addEventListener(
+        "keydown",
+        function(event) {
+            const closingCharacters = [
+                "}",
+                ")",
+                "]",
+                '"',
+                "'",
+                "`"
+            ];
+
+            if (
+                !closingCharacters.includes(
+                    event.key
+                )
+            ) {
+                return;
+            }
+
+            if (
+                editor.selectionStart !==
+                editor.selectionEnd
+            ) {
+                return;
+            }
+
+            const cursor =
+                editor.selectionStart;
+
+            const next =
+                editor.value.charAt(cursor);
+
+            if (next !== event.key) {
+                return;
+            }
+
+            event.preventDefault();
+
+            editor.selectionStart =
+                cursor + 1;
+
+            editor.selectionEnd =
+                cursor + 1;
+        }
+    );
+
+
+    /* =====================================================
+       INDENTATION ENTRE { }
+       ===================================================== */
+
+    editor.addEventListener(
+        "keydown",
+        function(event) {
+            if (
+                event.key !== "Enter" ||
+                editor.selectionStart !==
+                editor.selectionEnd
+            ) {
+                return;
+            }
+
+            const cursor =
+                editor.selectionStart;
+
+            const text =
+                editor.value;
+
+            const before =
+                text.slice(0, cursor);
+
+            const after =
+                text.slice(cursor);
+
+            const previousChar =
+                before.slice(-1);
+
+            const nextChar =
+                after.charAt(0);
+
+            if (
+                previousChar === "{" &&
+                nextChar === "}"
+            ) {
+                event.preventDefault();
+
+                const indentation =
+                    getCurrentIndentation(
+                        before
+                    );
+
+                const innerIndent =
+                    indentation + "    ";
+
+                const replacement =
+                    "\n" +
+                    innerIndent +
+                    "\n" +
+                    indentation;
+
+                editor.value =
+                    before +
+                    replacement +
+                    after;
+
+                editor.selectionStart =
+                    cursor +
+                    1 +
+                    innerIndent.length;
+
+                editor.selectionEnd =
+                    editor.selectionStart;
+
+                updateHighlight();
+
+                editor.dispatchEvent(
+                    new Event("input", {
+                        bubbles: true
+                    })
+                );
+
+                return;
+            }
+
+            /*
+             * Reprendre l'indentation de la ligne actuelle.
+             */
+
+            const indentation =
+                getCurrentIndentation(
+                    before
+                );
+
+            if (indentation) {
+                event.preventDefault();
+
+                editor.value =
+                    before +
+                    "\n" +
+                    indentation +
+                    after;
+
+                editor.selectionStart =
+                    cursor +
+                    1 +
+                    indentation.length;
+
+                editor.selectionEnd =
+                    editor.selectionStart;
+
+                updateHighlight();
+
+                editor.dispatchEvent(
+                    new Event("input", {
+                        bubbles: true
+                    })
+                );
+            }
+        }
+    );
+
+
+    /* =====================================================
+       CALCUL DE L'INDENTATION
+       ===================================================== */
+
+    function getCurrentIndentation(text) {
+        const lines =
+            text.split("\n");
+
+        const currentLine =
+            lines[lines.length - 1];
+
+        const match =
+            currentLine.match(
+                /^[\t ]*/
+            );
+
+        return match
+            ? match[0]
+            : "";
+    }
+
+
+    /* =====================================================
+       INITIALISATION
+       ===================================================== */
+
+    updateHighlight();
+
+})();
